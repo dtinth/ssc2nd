@@ -1,5 +1,10 @@
 
+var path = require('path');
 var fs = require('fs');
+
+console.log('');
+console.log('\033[1;36mssc2nd: StepMania 5 .ssc to Notedrop .txt converter\033[0m');
+console.log('');
 
 if (process.argv[2] == null) {
 	console.log('Usage: ssc2nd FILE.ssc');
@@ -9,12 +14,17 @@ if (process.argv[2] == null) {
 var notedatas = [];
 var globalTags = {};
 
+function outputFile(filename, contents) {
+	console.log('\033[1;33mWriting File: \033[1;37m' + filename + '\033[1;30m...\033[0m');
+	fs.writeFileSync(path.join(path.dirname(__filename), filename), contents, 'utf-8');
+}
+
 // Read note data
 (function() {
 	var currentNoteData = null;
 	var data = fs.readFileSync(process.argv[2], 'utf-8');
 
-	data = data.replace(/\/\/.*/, '');
+	data = data.replace(/\/\/.*/g, '');
 	data.replace(/#([^:]+):([^;]*);/g, function(all, key, value) {
 		var command = key.toLowerCase();
 		if (command == 'notedata') {
@@ -25,6 +35,61 @@ var globalTags = {};
 			globalTags[command] = value;
 		}
 	});
+})();
+
+// Process BPMs
+(function() {
+	var events = [];
+	var outEvents = [];
+	('' + globalTags.bpms).replace(/([0-9\.]+)\s*=\s*([0-9\.]+)/g, function(all, beat, bpm) {
+		events.push({
+			type: 'bpm',
+			beat: 1 * beat,
+			bpm: 1 * bpm
+		});
+	});
+	('' + globalTags.timesignatures).replace(/([0-9\.]+)\s*=\s*([0-9\.]+)\s*=\s*([0-9\.]+)/g, function(all, beat, num, den) {
+		events.push({
+			type: 'timeSignature',
+			beat: 1 * beat,
+			num: 1 * num,
+			den: 1 * den
+		});
+	});
+	events.sort(function(a, b) {
+		return a.beat - b.beat;
+	});
+	function addEvent(time, newBPM, timeSignature) {
+		if (time != 0) {
+			var ms = Math.round(time * 1000);
+			if (outEvents.length > 0 && outEvents[outEvents.length - 1][0] == ms) {
+				outEvents.pop();
+			}
+			outEvents.push([ms, newBPM, timeSignature, -1].join(','));
+		}
+	}
+	(function() {
+		var lastTime = 0;
+		var lastBeat = 0;
+		var bpm = 60;
+		var timeSignature = 4;
+		events.forEach(function(c) {
+			var beat = c.beat;
+			var time = lastTime + (beat - lastBeat) * 60 / bpm;
+			if (c.type == 'bpm') {
+				bpm = c.bpm;
+				addEvent(time, bpm, timeSignature);
+			} else if (c.type == 'timeSignature') {
+				timeSignature = c.num * 4 / c.den;
+				addEvent(time, bpm, timeSignature);
+			}
+			lastTime = time;
+			lastBeat = beat;
+		});
+	})();
+	if (outEvents.length > 0) {
+		outputFile(globalTags.artist + '-' + globalTags.title + '-MultiBPM.txt', outEvents.join('\n'));
+	}
 })();
 
 // Process note data
@@ -67,7 +132,7 @@ var globalTags = {};
 							longnoteBuffer[column] = beat;
 						} else if (c == '3') {
 							chartData.push('H,' + longnoteBuffer[column] + ',' + beat + ',' + column);
-							delete longnoteBuffer[column]
+							delete longnoteBuffer[column];
 						}
 					}
 				}
@@ -75,6 +140,8 @@ var globalTags = {};
 		}
 		process(players[0], '');
 		if (players[1]) process(players[1], '+');
-		fs.writeFileSync(chartName + '.txt', chartData.join('\n'), 'utf-8');
+		outputFile(chartName + '.txt', chartData.join('\n'));
 	});
 })();
+
+console.log('\033[1;32mAll Done!\n\033[0m');
