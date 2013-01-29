@@ -97,13 +97,16 @@ function outputFile(filename, contents) {
 	notedatas.forEach(function(notedata) {
 		var keys = 'N';
 		if (notedata.stepstype == 'dance-single') keys = '4';
+		else if (notedata.stepstype == 'dance-routine') keys = '2';
+		else if (notedata.stepstype == 'dance-couple') keys = '4';
 		else if (notedata.stepstype == 'dance-double') keys = '8';
 		else if (notedata.stepstype == 'dance-solo') keys = '6';
 		var difficulty = 'NM';
 		if (notedata.difficulty == 'Hard') difficulty = 'HD';
 		else if (notedata.difficulty == 'Challenge') difficulty = 'SU';
-		else if (notedata.difficulty == 'Beginner') difficulty = 'LT';
+		else if (notedata.difficulty == 'Easy') difficulty = 'LT';
 		var chartType = keys + 'K-' + difficulty;
+		if (notedata.stepstype == 'dance-couple' || notedata.stepstype == 'dance-routine') chartType = keys + 'K+-' + difficulty;
 		var chartName = globalTags.subtitle + '-' + globalTags.artist + '-' + globalTags.title + '-' +chartType;
 		var chartData = ['// converted by ssc2nd', ''];
 		var players = notedata.notes.split(/&/);
@@ -127,11 +130,13 @@ function outputFile(filename, contents) {
 						var column = j + 1;
 						var c = item[j];
 						if (c == '1') {
-							chartData.push('N,' + beat + ',' + column);
+							if (notedata.stepstype == 'dance-couple' && column > 4 || notedata.stepstype == 'dance-routine' && column > 4) chartData.push('N,' + beat + ',' + (column - 4) + '+');
+							else chartData.push('N,' + beat + ',' + column);
 						} else if (c == '2') {
 							longnoteBuffer[column] = beat;
 						} else if (c == '3') {
-							chartData.push('H,' + longnoteBuffer[column] + ',' + beat + ',' + column);
+							if (notedata.stepstype == 'dance-couple' && column > 4 || notedata.stepstype == 'dance-routine' && column > 4) chartData.push('H,' + longnoteBuffer[column] + ',' + beat + ',' + (column - 4) + '+');
+							else chartData.push('H,' + longnoteBuffer[column] + ',' + beat + ',' + column);
 							delete longnoteBuffer[column];
 						}
 					}
